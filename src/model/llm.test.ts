@@ -19,4 +19,21 @@ describe('OpenAI API routing', () => {
       }
     }
   });
+
+  test('uses the configured OpenAI-compatible base URL', () => {
+    const previousApiKey = process.env.OPENAI_API_KEY;
+    const previousBaseUrl = process.env.OPENAI_BASE_URL;
+    process.env.OPENAI_API_KEY = 'test-key';
+    process.env.OPENAI_BASE_URL = 'https://example.test/v1';
+
+    try {
+      const llm = getChatModel('gpt-5.6-sol') as { clientConfig?: { baseURL?: string } };
+      expect(llm.clientConfig?.baseURL).toBe('https://example.test/v1');
+    } finally {
+      if (previousApiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousApiKey;
+      if (previousBaseUrl === undefined) delete process.env.OPENAI_BASE_URL;
+      else process.env.OPENAI_BASE_URL = previousBaseUrl;
+    }
+  });
 });

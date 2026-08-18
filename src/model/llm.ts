@@ -148,6 +148,9 @@ const DEFAULT_FACTORY: ModelFactory = (name, opts) =>
     model: name,
     ...opts,
     apiKey: getApiKey('OPENAI_API_KEY'),
+    ...(process.env.OPENAI_BASE_URL
+      ? { configuration: { baseURL: process.env.OPENAI_BASE_URL } }
+      : {}),
     // GPT-5.6 requires the Responses API when reasoning and function tools are combined.
     useResponsesApi: name.startsWith('gpt-5.6-'),
   });

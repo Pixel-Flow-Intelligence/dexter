@@ -55,6 +55,9 @@ yarn-error.log*
 # Dexter context files (offloaded tool outputs)
 .dexter/*
 
+# Pulled copy of the remote Dexter .env
+.tmp-remote-env/
+
 
 logs/
 coverage.json
