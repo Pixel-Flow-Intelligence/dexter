@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package nofx.dexter.v1;
+
+service DexterRuntimeService {
+  rpc Execute(stream RuntimeCommand) returns (stream RuntimeEvent);
+  rpc GetRun(GetRunRequest) returns (GetRunResponse);
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
+  rpc ResumeRun(ResumeRunRequest) returns (ResumeRunResponse);
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message RuntimeCommand {
+  oneof command {
+    StartRun start_run = 1;
+    ToolResult tool_result = 2;
+    ResumeInput resume_input = 3;
+    CancelRun cancel_run = 4;
+    Ack ack = 5;
+  }
+}
+
+message StartRun {
+  string run_id = 1;
+  string agent_id = 2;
+  string session_id = 3;
+  string user_id = 4;
+  string prompt = 5;
+  string model = 6;
+  string model_provider = 7;
+  bool memory_enabled = 8;
+  int32 max_iterations = 9;
+  repeated ToolCapability tool_capabilities = 10;
+  map<string, string> metadata = 11;
+}
+
+message ToolCapability { string name = 1; }
+message ToolResult { string request_id = 1; bool success = 2; string result_json = 3; string error_code = 4; string error_message = 5; repeated string artifact_ids = 6; }
+message ResumeInput { string run_id = 1; string input = 2; }
+message CancelRun { string run_id = 1; }
+message Ack { string run_id = 1; uint64 sequence = 2; }
+message GetRunRequest { string run_id = 1; uint64 after_sequence = 2; }
+message CancelRunRequest { string run_id = 1; }
+message ResumeRunRequest { string run_id = 1; uint64 after_sequence = 2; }
+message HealthCheckRequest {}
+
+message RuntimeEvent {
+  string run_id = 1;
+  string event_id = 2;
+  uint64 sequence = 3;
+  string occurred_at = 4;
+  oneof event {
+    RunAccepted accepted = 10;
+    ProgressEvent progress = 11;
+    ToolRequest tool_request = 12;
+    InputRequired input_required = 13;
+    ReportEvent report = 14;
+    RunCompleted completed = 15;
+    RunFailed failed = 16;
+    RunCancelled cancelled = 17;
+    Heartbeat heartbeat = 18;
+  }
+}
+
+message RunAccepted {}
+message ProgressEvent { string message = 1; string tool = 2; string result = 3; string error = 4; }
+message ToolRequest { string request_id = 1; string tool_name = 2; string arguments_json = 3; string run_id = 4; string step_label = 5; }
+message InputRequired { string prompt = 1; }
+message ReportEvent { string answer = 1; }
+message RunCompleted { string answer = 1; }
+message RunFailed { string error = 1; }
+message RunCancelled {}
+message Heartbeat {}
+
+message GetRunResponse { string run_id = 1; string status = 2; repeated RuntimeEvent events = 3; }
+message ResumeRunResponse { string run_id = 1; string status = 2; repeated RuntimeEvent events = 3; }
+message CancelRunResponse { bool accepted = 1; }
+message HealthCheckResponse { string status = 1; string version = 2; int32 active_runs = 3; }

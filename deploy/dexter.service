@@ -1,0 +1,23 @@
+[Unit]
+Description=Dexter headless research gRPC server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/Project/dexter
+Environment=NODE_ENV=production
+Environment=PATH=/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=DEXTER_GRPC_HOST=127.0.0.1
+Environment=DEXTER_GRPC_PORT=50071
+EnvironmentFile=-/root/Project/dexter/.env
+ExecStart=/root/.bun/bin/bun run server
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
