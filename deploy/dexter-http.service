@@ -1,0 +1,23 @@
+[Unit]
+Description=Dexter headless research HTTP SSE server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/Project/dexter
+Environment=NODE_ENV=production
+Environment=PATH=/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=DEXTER_HTTP_HOST=127.0.0.1
+Environment=DEXTER_HTTP_PORT=8787
+EnvironmentFile=-/root/Project/dexter/.env
+ExecStart=/root/.bun/bin/bun run http
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

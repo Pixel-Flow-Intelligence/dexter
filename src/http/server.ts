@@ -34,6 +34,9 @@ export function sseEvent(event: HeadlessEvent): string {
 
 async function handleRequest(request: Request, runner: HeadlessRunner): Promise<Response> {
   const url = new URL(request.url);
+  if (!isAuthorized(request)) {
+    return json({ error: 'unauthorized' }, 401);
+  }
   if (request.method === 'GET' && url.pathname === '/healthz') {
     return json({ status: 'ok', service: 'dexter-http' });
   }
@@ -87,4 +90,10 @@ async function handleRequest(request: Request, runner: HeadlessRunner): Promise<
 
 function json(value: Record<string, unknown>, status = 200): Response {
   return Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
+}
+
+function isAuthorized(request: Request): boolean {
+  const token = process.env.DEXTER_SERVICE_TOKEN?.trim();
+  if (!token) return process.env.NODE_ENV !== 'production';
+  return request.headers.get('authorization') === `Bearer ${token}`;
 }
