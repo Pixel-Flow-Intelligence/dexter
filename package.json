@@ -12,6 +12,8 @@
     "start": "bun run src/index.tsx",
     "server": "bun run src/server/index.ts",
     "server:dev": "bun --watch run src/server/index.ts",
+    "http": "bun run src/http/index.ts",
+    "http:dev": "bun --watch run src/http/index.ts",
     "remote": "bun run src/remote-cli/index.ts",
     "remote:bridge": "bun run src/remote-cli/bridge.ts",
     "dev": "bun --watch run src/index.tsx",

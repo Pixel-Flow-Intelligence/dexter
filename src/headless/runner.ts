@@ -76,7 +76,7 @@ export class HeadlessRunner {
         yield emit('cancelled');
         return;
       }
-      if (answer) await history.saveAnswer(answer);
+      if (answer) await history.saveAnswer(answer, false);
       yield emit('completed', { answer });
     } catch (error) {
       if (request.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {

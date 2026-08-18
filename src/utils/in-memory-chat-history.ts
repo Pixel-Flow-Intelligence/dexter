@@ -78,14 +78,16 @@ Generate a brief 1-2 sentence summary of this answer.`;
   /**
    * Saves the answer to the most recent message and generates a summary.
    */
-  async saveAnswer(answer: string): Promise<void> {
+  async saveAnswer(answer: string, generateSummary = true): Promise<void> {
     const lastMessage = this.messages[this.messages.length - 1];
     if (!lastMessage || lastMessage.answer !== null) {
       return;
     }
 
     lastMessage.answer = answer;
-    lastMessage.summary = await this.generateSummary(lastMessage.query, answer);
+    lastMessage.summary = generateSummary
+      ? await this.generateSummary(lastMessage.query, answer)
+      : answer;
   }
 
   /**
