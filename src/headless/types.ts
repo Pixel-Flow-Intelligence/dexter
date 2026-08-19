@@ -1,6 +1,18 @@
 import type { Agent, AgentConfig, AgentEvent } from '../agent/index.js';
 import type { InMemoryChatHistory } from '../utils/in-memory-chat-history.js';
 
+export interface HeadlessOutputTemplate {
+  templateKey?: string;
+  title?: string;
+  contentMarkdown?: string;
+  sections?: Array<{
+    key?: string;
+    title?: string;
+    purpose?: string;
+    required?: boolean;
+  }>;
+}
+
 export interface HeadlessRunRequest {
   runId: string;
   sessionId: string;
@@ -11,6 +23,8 @@ export interface HeadlessRunRequest {
   memoryEnabled?: boolean;
   signal?: AbortSignal;
   metadata?: Record<string, string>;
+  outputTemplate?: HeadlessOutputTemplate;
+  systemPromptAppendix?: string;
 }
 
 export interface HeadlessAcceptedEvent {

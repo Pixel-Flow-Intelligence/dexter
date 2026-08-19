@@ -3,7 +3,9 @@ import type { AgentConfig, AgentEvent } from '../agent/types.js';
 import { InMemoryChatHistory } from '../utils/in-memory-chat-history.js';
 import type {
   HeadlessAgentFactory,
+  HeadlessAgentLike,
   HeadlessEvent,
+  HeadlessOutputTemplate,
   HeadlessRunRequest,
   HeadlessRunnerOptions,
 } from './types.js';
@@ -53,8 +55,16 @@ export class HeadlessRunner {
         memoryEnabled: request.memoryEnabled,
         signal: request.signal,
         channel: 'headless',
+        systemPromptAppendix: request.systemPromptAppendix || buildOutputTemplateAppendix(request.outputTemplate),
       };
-      const agent = await this.createAgent(config);
+      let agent: HeadlessAgentLike;
+      try {
+        agent = await this.createAgent(config);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        yield emit('failed', { error: `无法加载模型 ${request.model}：${detail}` });
+        return;
+      }
       history.saveUserQuery(request.query);
 
       let answer = '';
@@ -124,4 +134,21 @@ function mapAgentEvent(
     default:
       return undefined;
   }
+}
+
+function buildOutputTemplateAppendix(template?: HeadlessOutputTemplate): string | undefined {
+  if (!template) return undefined;
+  const titles = (template.sections || [])
+    .map((item) => String(item.title || '').trim())
+    .filter(Boolean);
+  const markdown = String(template.contentMarkdown || '').trim();
+  if (titles.length === 0 && !markdown) return undefined;
+  const sectionLines = titles.map((title, index) => `${index + 1}. ${title}`).join('\n');
+  return [
+    '## nofx 输出模板',
+    '最终回答必须是 Markdown。若提供了章节列表，章节标题必须与下列 title 完全一致，不得增删或改名。',
+    template.title ? `模板名称：${template.title}` : '',
+    sectionLines ? `章节：\n${sectionLines}` : '',
+    markdown ? `模板正文：\n${markdown}` : '',
+  ].filter(Boolean).join('\n');
 }

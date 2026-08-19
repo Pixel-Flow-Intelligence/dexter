@@ -81,6 +81,8 @@ export interface AgentConfig {
    * that run with a self-contained worker prompt.
    */
   systemPromptOverride?: string;
+  /** Appended after the default system prompt; does not replace soul/rules. */
+  systemPromptAppendix?: string;
   /** Optional short label (e.g. "research") used to prefix nested progress lines. */
   agentLabel?: string;
 }

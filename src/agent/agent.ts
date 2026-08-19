@@ -119,6 +119,10 @@ export class Agent {
         rulesContent,
       );
     }
+    const appendix = config.systemPromptAppendix?.trim();
+    if (appendix) {
+      systemPrompt = `${systemPrompt}\n\n${appendix}`;
+    }
     return new Agent(config, tools, systemPrompt, concurrencyMap);
   }
 

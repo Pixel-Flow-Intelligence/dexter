@@ -64,6 +64,16 @@ function getApiKey(envVar: string): string {
   return apiKey;
 }
 
+/**
+ * OpenAI-compatible gateways expose the API under `/v1`; normalize the
+ * configured root so the SDK does not accidentally request the web frontend.
+ */
+function getOpenAIBaseUrl(): string | undefined {
+  const rawBaseUrl = process.env.OPENAI_BASE_URL?.trim().replace(/\/+$/, '');
+  if (!rawBaseUrl) return undefined;
+  return /\/v\d+(?:\/|$)/i.test(rawBaseUrl) ? rawBaseUrl : `${rawBaseUrl}/v1`;
+}
+
 // Factories keyed by provider id — prefix routing is handled by resolveProvider()
 const MODEL_FACTORIES: Record<string, ModelFactory> = {
   anthropic: (name, opts) =>
@@ -143,17 +153,17 @@ const MODEL_FACTORIES: Record<string, ModelFactory> = {
   },
 };
 
-const DEFAULT_FACTORY: ModelFactory = (name, opts) =>
-  new ChatOpenAI({
+const DEFAULT_FACTORY: ModelFactory = (name, opts) => {
+  const baseURL = getOpenAIBaseUrl();
+  return new ChatOpenAI({
     model: name,
     ...opts,
     apiKey: getApiKey('OPENAI_API_KEY'),
-    ...(process.env.OPENAI_BASE_URL
-      ? { configuration: { baseURL: process.env.OPENAI_BASE_URL } }
-      : {}),
+    ...(baseURL ? { configuration: { baseURL } } : {}),
     // GPT-5.6 requires the Responses API when reasoning and function tools are combined.
     useResponsesApi: name.startsWith('gpt-5.6-'),
   });
+};
 
 export function getChatModel(
   modelName: string = DEFAULT_MODEL,
