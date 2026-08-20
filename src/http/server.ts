@@ -1,4 +1,5 @@
 import { config } from 'dotenv';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { HeadlessRunner } from '../headless/runner.js';
 import type { HeadlessEvent } from '../headless/types.js';
 import { parseResearchRequest } from './request.js';
@@ -13,19 +14,45 @@ export interface HttpServerOptions {
   runner?: HeadlessRunner;
 }
 
-export function createHttpServer(options: HttpServerOptions = {}): ReturnType<typeof Bun.serve> {
-  const host = options.host ?? process.env.DEXTER_HTTP_HOST ?? '127.0.0.1';
-  const port = options.port ?? Number(process.env.DEXTER_HTTP_PORT ?? 8787);
-  const runner = options.runner ?? new HeadlessRunner();
+export interface HttpServer {
+  readonly hostname: string;
+  readonly port: number;
+  start(): Promise<void>;
+  stop(force?: boolean): void;
+}
 
-  return Bun.serve({
-    hostname: host,
-    port,
-    // SSE requests can legitimately wait longer than Bun's 10-second default
-    // while the agent is waiting for an LLM or external tool response.
-    idleTimeout: 0,
-    fetch: async (request) => handleRequest(request, runner),
+export function createHttpServer(options: HttpServerOptions = {}): HttpServer {
+  const host = options.host ?? process.env.DEXTER_HTTP_HOST ?? '127.0.0.1';
+  const requestedPort = options.port ?? Number(process.env.DEXTER_HTTP_PORT ?? 8787);
+  const runner = options.runner ?? new HeadlessRunner();
+  const nodeServer = createServer((request, response) => {
+    void handleNodeRequest(request, response, runner);
   });
+
+  return {
+    hostname: host,
+    get port() {
+      const address = nodeServer.address();
+      return typeof address === 'object' && address ? address.port : requestedPort;
+    },
+    start: () => new Promise<void>((resolve, reject) => {
+      const onError = (error: Error) => {
+        nodeServer.off('listening', onListening);
+        reject(error);
+      };
+      const onListening = () => {
+        nodeServer.off('error', onError);
+        resolve();
+      };
+      nodeServer.once('error', onError);
+      nodeServer.once('listening', onListening);
+      nodeServer.listen(requestedPort, host);
+    }),
+    stop: (force = false) => {
+      if (force) nodeServer.closeAllConnections();
+      if (nodeServer.listening) nodeServer.close();
+    },
+  };
 }
 
 export function sseEvent(event: HeadlessEvent): string {
@@ -86,6 +113,79 @@ async function handleRequest(request: Request, runner: HeadlessRunner): Promise<
       'X-Accel-Buffering': 'no',
     },
   });
+}
+
+async function handleNodeRequest(
+  incoming: IncomingMessage,
+  outgoing: ServerResponse,
+  runner: HeadlessRunner,
+): Promise<void> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  incoming.once('aborted', abort);
+  outgoing.once('close', () => {
+    if (!outgoing.writableFinished) controller.abort();
+  });
+
+  try {
+    const body = incoming.method === 'GET' || incoming.method === 'HEAD'
+      ? undefined
+      : await readBody(incoming, controller.signal);
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(incoming.headers)) {
+      if (value !== undefined) headers.set(name, Array.isArray(value) ? value.join(', ') : value);
+    }
+    const host = headers.get('host') ?? `${hostName(incoming)}:${hostPort(incoming)}`;
+    const request = new Request(`http://${host}${incoming.url ?? '/'}`, {
+      method: incoming.method ?? 'GET',
+      headers,
+      body: body?.toString('utf8'),
+      signal: controller.signal,
+    });
+    const response = await handleRequest(request, runner);
+
+    response.headers.forEach((value, name) => outgoing.setHeader(name, value));
+    outgoing.writeHead(response.status);
+    if (!response.body) {
+      outgoing.end();
+      return;
+    }
+
+    const reader = response.body.getReader();
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        if (!outgoing.destroyed) outgoing.write(chunk.value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    outgoing.end();
+  } catch (error) {
+    if (controller.signal.aborted || outgoing.destroyed) return;
+    outgoing.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+    outgoing.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+  } finally {
+    incoming.off('aborted', abort);
+  }
+}
+
+async function readBody(request: IncomingMessage, signal: AbortSignal): Promise<Buffer | undefined> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    if (signal.aborted) return undefined;
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return chunks.length > 0 ? Buffer.concat(chunks) : undefined;
+}
+
+function hostName(request: IncomingMessage): string {
+  return request.socket.localAddress ?? '127.0.0.1';
+}
+
+function hostPort(request: IncomingMessage): number {
+  return request.socket.localPort ?? 80;
 }
 
 function json(value: Record<string, unknown>, status = 200): Response {

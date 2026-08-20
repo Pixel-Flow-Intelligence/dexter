@@ -1,6 +1,7 @@
 import { createHttpServer } from './server.js';
 
 const server = createHttpServer();
+await server.start();
 process.stdout.write(`Dexter HTTP SSE server listening on http://${server.hostname}:${server.port}\n`);
 
 const shutdown = () => {

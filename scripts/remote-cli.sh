@@ -163,7 +163,7 @@ set -euo pipefail
 export PATH="\$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin:\$PATH"
 echo -n "tmux: "; command -v tmux >/dev/null && echo "ok" || echo "missing"
 echo -n "bun:  "; command -v bun >/dev/null && bun --version || echo "missing"
-echo -n "repo: "; if [ -d '${REMOTE_PROJECT_DIR}/.git' ]; then git -C '${REMOTE_PROJECT_DIR}' rev-parse --short HEAD; else echo "missing"; fi
+echo -n "repo: "; if [ -d '${REMOTE_PROJECT_DIR}/.git' ]; then git -c safe.directory='${REMOTE_PROJECT_DIR}' -C '${REMOTE_PROJECT_DIR}' rev-parse --short HEAD; else echo "missing"; fi
 echo -n ".env: "; if [ -f '${REMOTE_ENV_FILE}' ]; then echo "present"; else echo "missing"; fi
 echo "sessions:"
 tmux list-sessions -F '  #{session_name} (#{?session_attached,attached,detached})' 2>/dev/null | grep 'dexter-' || echo "  (none)"
