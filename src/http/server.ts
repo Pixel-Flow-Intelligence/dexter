@@ -30,6 +30,10 @@ export function createHttpServer(options: HttpServerOptions = {}): HttpServer {
   const nodeServer = createServer((request, response) => {
     void handleNodeRequest(request, response, runner);
   });
+  // 研究 SSE 可能连续跑数分钟；关掉 Node 默认请求超时，避免对端读到半截 chunked body。
+  nodeServer.requestTimeout = 0;
+  nodeServer.headersTimeout = 0;
+  nodeServer.timeout = 0;
 
   return {
     hostname: host,
@@ -91,6 +95,13 @@ async function handleRequest(request: Request, runner: HeadlessRunner): Promise<
   request.signal.addEventListener('abort', () => abortController.abort(), { once: true });
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const ping = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(': ping\n\n'));
+        } catch {
+          clearInterval(ping);
+        }
+      }, 15000);
       try {
         for await (const event of runner.run({ ...parsed, signal: abortController.signal })) {
           controller.enqueue(encoder.encode(sseEvent(event)));
@@ -100,6 +111,8 @@ async function handleRequest(request: Request, runner: HeadlessRunner): Promise<
       } catch (error) {
         controller.enqueue(encoder.encode(`event: failed\ndata: ${JSON.stringify({ error: error instanceof Error ? error.message : String(error) })}\n\n`));
         controller.close();
+      } finally {
+        clearInterval(ping);
       }
     },
     cancel() {
@@ -158,18 +171,27 @@ async function handleNodeRequest(
       while (true) {
         const chunk = await reader.read();
         if (chunk.done) break;
-        if (!outgoing.destroyed) outgoing.write(chunk.value);
+        if (outgoing.destroyed) break;
+        outgoing.write(chunk.value);
       }
     } finally {
       reader.releaseLock();
     }
-    outgoing.end();
+    if (!outgoing.writableEnded && !outgoing.destroyed) outgoing.end();
   } catch (error) {
+    process.stderr.write(`[dexter-http] 处理请求失败 ${error instanceof Error ? error.stack || error.message : String(error)}\n`);
+    if (outgoing.headersSent) {
+      if (!outgoing.writableEnded && !outgoing.destroyed) outgoing.end();
+      return;
+    }
     if (controller.signal.aborted || outgoing.destroyed) return;
     outgoing.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
     outgoing.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
   } finally {
     incoming.off('aborted', abort);
+    if (outgoing.headersSent && !outgoing.writableEnded && !outgoing.destroyed) {
+      outgoing.end();
+    }
   }
 }
 

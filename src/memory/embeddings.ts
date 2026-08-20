@@ -1,6 +1,7 @@
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { OllamaEmbeddings } from '@langchain/ollama';
 import { OpenAIEmbeddings } from '@langchain/openai';
+import { getOpenAICompatibleBaseUrl } from '../utils/openai-base-url.js';
 import type { EmbeddingProviderId, MemoryEmbeddingClient } from './types.js';
 
 const DEFAULT_OPENAI_MODEL = 'text-embedding-3-small';
@@ -77,10 +78,7 @@ export function createEmbeddingClient(params: {
 
   if (resolved === 'openai') {
     const model = params.model || DEFAULT_OPENAI_MODEL;
-    const embeddings = new OpenAIEmbeddings({
-      apiKey: process.env.OPENAI_API_KEY,
-      model,
-    });
+    const embeddings = createOpenAIEmbeddings(model);
     return {
       provider: 'openai',
       model,
@@ -116,6 +114,15 @@ export function createEmbeddingClient(params: {
   };
 }
 
+export function createOpenAIEmbeddings(model = DEFAULT_OPENAI_MODEL): OpenAIEmbeddings {
+  const baseURL = getOpenAICompatibleBaseUrl();
+  return new OpenAIEmbeddings({
+    apiKey: process.env.OPENAI_API_KEY,
+    model,
+    ...(baseURL ? { configuration: { baseURL } } : {}),
+  });
+}
+
 export async function embedSingleQuery(
   client: MemoryEmbeddingClient | null,
   query: string,
@@ -123,6 +130,11 @@ export async function embedSingleQuery(
   if (!client) {
     return null;
   }
-  const vectors = await withTimeout(client.embed([query]), EMBEDDING_TIMEOUT_MS, 'Embedding query timed out');
-  return vectors[0] ?? null;
+  try {
+    const vectors = await withTimeout(client.embed([query]), EMBEDDING_TIMEOUT_MS, 'Embedding query timed out');
+    return vectors[0] ?? null;
+  } catch {
+    // Gateway/SDK may throw (e.g. missing `data[0]`) — fall back to keyword search.
+    return null;
+  }
 }

@@ -14,6 +14,7 @@ import type { TokenUsage } from '../agent/types.js';
 import { logger } from '../utils/index.js';
 import { classifyError, isNonRetryableError } from '../utils/errors.js';
 import { resolveProvider, getProviderById } from '../providers.js';
+import { getOpenAICompatibleBaseUrl } from '../utils/openai-base-url.js';
 
 export const DEFAULT_PROVIDER = 'openai';
 export const DEFAULT_MODEL = 'gpt-5.6-sol';
@@ -64,17 +65,7 @@ function getApiKey(envVar: string): string {
   return apiKey;
 }
 
-/**
- * OpenAI-compatible gateways expose the API under `/v1`; normalize the
- * configured root so the SDK does not accidentally request the web frontend.
- */
-function getOpenAIBaseUrl(): string | undefined {
-  const rawBaseUrl = process.env.OPENAI_BASE_URL?.trim().replace(/\/+$/, '');
-  if (!rawBaseUrl) return undefined;
-  return /\/v\d+(?:\/|$)/i.test(rawBaseUrl) ? rawBaseUrl : `${rawBaseUrl}/v1`;
-}
-
-// Factories keyed by provider id — prefix routing is handled by resolveProvider()
+const getOpenAIBaseUrl = getOpenAICompatibleBaseUrl;
 const MODEL_FACTORIES: Record<string, ModelFactory> = {
   anthropic: (name, opts) =>
     new ChatAnthropic({
