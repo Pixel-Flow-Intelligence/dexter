@@ -2,9 +2,11 @@ import { config } from 'dotenv';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { HeadlessRunner } from '../headless/runner.js';
 import type { HeadlessEvent } from '../headless/types.js';
+import { applyDexterOwnedEnv } from '../utils/env.js';
 import { parseResearchRequest } from './request.js';
 
 config({ quiet: true });
+applyDexterOwnedEnv();
 
 const encoder = new TextEncoder();
 

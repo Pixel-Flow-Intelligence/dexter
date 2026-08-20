@@ -1,8 +1,10 @@
 import { config } from 'dotenv';
+import { applyDexterOwnedEnv } from '../utils/env.js';
 import { loadServerConfig } from './config.js';
 import { DexterGrpcServer } from './grpc-server.js';
 
 config({ quiet: true });
+applyDexterOwnedEnv();
 const server = new DexterGrpcServer(loadServerConfig());
 await server.start();
 
