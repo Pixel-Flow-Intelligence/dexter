@@ -4,6 +4,7 @@ import { HeadlessRunner } from '../headless/runner.js';
 import type { HeadlessEvent } from '../headless/types.js';
 import { applyDexterOwnedEnv } from '../utils/env.js';
 import { parseResearchRequest } from './request.js';
+import { checkProvidersStatus } from './providers-status.js';
 
 config({ quiet: true });
 applyDexterOwnedEnv();
@@ -72,6 +73,14 @@ async function handleRequest(request: Request, runner: HeadlessRunner): Promise<
   }
   if (request.method === 'GET' && url.pathname === '/healthz') {
     return json({ status: 'ok', service: 'dexter-http' });
+  }
+  if (request.method === 'GET' && url.pathname === '/v1/providers/status') {
+    const filter = url.searchParams.get('providers');
+    const providers = filter
+      ? filter.split(',').map((p) => p.trim()).filter(Boolean)
+      : undefined;
+    const report = await checkProvidersStatus({ providers });
+    return json(report);
   }
   if (request.method !== 'POST' || url.pathname !== '/v1/research') {
     return json({ error: 'not found' }, 404);
@@ -212,7 +221,7 @@ function hostPort(request: IncomingMessage): number {
   return request.socket.localPort ?? 80;
 }
 
-function json(value: Record<string, unknown>, status = 200): Response {
+function json(value: unknown, status = 200): Response {
   return Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 

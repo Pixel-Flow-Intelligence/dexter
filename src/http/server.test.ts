@@ -36,6 +36,33 @@ describe('Node HTTP server', () => {
       expect(health.status).toBe(200);
       expect(await health.json()).toEqual({ status: 'ok', service: 'dexter-http' });
 
+      const previousFetch = globalThis.fetch;
+      const previousFmp = process.env.FMP_API_KEY;
+      delete process.env.FMP_API_KEY;
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes('127.0.0.1') || url.includes('localhost')) {
+          return previousFetch(input, init);
+        }
+        if (url.includes('sec.gov')) {
+          return new Response(JSON.stringify({ '0': { ticker: 'AAPL' } }), { status: 200 });
+        }
+        return new Response('skip', { status: 401 });
+      }) as typeof fetch;
+      try {
+        const status = await fetch(`${baseUrl}/v1/providers/status?providers=sec,fmp`, { headers });
+        expect(status.status).toBe(200);
+        const body = await status.json() as {
+          providers: Array<{ id: string; status: string }>;
+        };
+        expect(body.providers.some((p) => p.id === 'sec' && p.status === 'ok')).toBe(true);
+        expect(body.providers.some((p) => p.id === 'fmp' && p.status === 'skipped')).toBe(true);
+      } finally {
+        globalThis.fetch = previousFetch;
+        if (previousFmp === undefined) delete process.env.FMP_API_KEY;
+        else process.env.FMP_API_KEY = previousFmp;
+      }
+
       const response = await fetch(`${baseUrl}/v1/research`, {
         method: 'POST',
         headers: { ...headers, 'content-type': 'application/json' },

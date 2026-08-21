@@ -5,6 +5,9 @@ REMOTE_KEY ?= ~/.ssh/nofx
 REMOTE_PROJECT_DIR ?= /root/Project/dexter
 REMOTE_SERVICE ?= dexter-grpc
 REMOTE_HTTP_SERVICE ?= dexter-http
+REMOTE_HTTP_URL ?= http://127.0.0.1:8787
+# Optional filter, e.g. make -f deploy/remote.mk remote-providers-status PROVIDERS=finnhub,fmp,sec
+PROVIDERS ?=
 REMOTE_NGINX_SITE ?= dexter.moltbot.dpdns.org.conf
 REMOTE_OLD_NGINX_SITE ?= dexter.aitrading.dpdns.org.conf
 REMOTE_NGINX_AVAILABLE_DIR ?= /etc/nginx/sites-available
@@ -12,7 +15,7 @@ REMOTE_NGINX_ENABLED_DIR ?= /etc/nginx/sites-enabled
 SSH_OPTS := -i $(REMOTE_KEY) -p $(REMOTE_PORT) -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes -o IdentitiesOnly=yes
 SCP_OPTS := -i $(REMOTE_KEY) -P $(REMOTE_PORT) -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes -o IdentitiesOnly=yes
 
-.PHONY: remote-deploy remote-status remote-logs remote-stop remote-health
+.PHONY: remote-deploy remote-status remote-logs remote-stop remote-health remote-providers-status
 
 remote-deploy:
 	@set -eu; \
@@ -33,3 +36,19 @@ remote-stop:
 
 remote-health:
 	@ssh $(SSH_OPTS) $(REMOTE_USER)@$(REMOTE_HOST) 'cd $(REMOTE_PROJECT_DIR) && timeout 10 /usr/bin/node dist/server/index.js >/tmp/dexter-health.log 2>&1 & pid=$$!; sleep 2; ss -lntp | grep ":50071 "; kill $$pid 2>/dev/null || true; wait $$pid 2>/dev/null || true; tail -n 20 /tmp/dexter-health.log'
+
+# Probe external data providers via GET /v1/providers/status on the remote HTTP service.
+remote-providers-status:
+	@ssh $(SSH_OPTS) $(REMOTE_USER)@$(REMOTE_HOST) 'set -eu; \
+		cd $(REMOTE_PROJECT_DIR); \
+		TOKEN=$$(grep -E "^DEXTER_SERVICE_TOKEN=" .env | head -n1 | cut -d= -f2- | tr -d "\"'\''"); \
+		if [ -z "$$TOKEN" ]; then echo "DEXTER_SERVICE_TOKEN missing in $(REMOTE_PROJECT_DIR)/.env" >&2; exit 1; fi; \
+		URL="$(REMOTE_HTTP_URL)/v1/providers/status"; \
+		if [ -n "$(PROVIDERS)" ]; then URL="$$URL?providers=$(PROVIDERS)"; fi; \
+		echo "GET $$URL"; \
+		BODY=$$(curl -sS --max-time 120 -H "Authorization: Bearer $$TOKEN" -H "Accept: application/json" "$$URL"); \
+		if command -v python3 >/dev/null 2>&1; then printf "%s\n" "$$BODY" | python3 -m json.tool; \
+		elif command -v jq >/dev/null 2>&1; then printf "%s\n" "$$BODY" | jq .; \
+		else printf "%s\n" "$$BODY"; fi; \
+		ERRS=$$(printf "%s" "$$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get(\"summary\",{}).get(\"error\",0))" 2>/dev/null || echo 0); \
+		if [ "$$ERRS" != "0" ]; then echo "providers with errors: $$ERRS" >&2; exit 1; fi'
