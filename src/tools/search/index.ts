@@ -3,7 +3,9 @@
  * Used in the system prompt to guide the LLM on when and how to use this tool.
  */
 export const WEB_SEARCH_DESCRIPTION = `
-Search the web for current information on any topic. Returns relevant search results with URLs and content snippets.
+Search the web for current information on any topic.
+
+By default this uses the current model's built-in search through Sub2API (OpenAI/Grok/Claude web_search, Gemini google_search) and returns a sourced synthesis. If native search is unavailable or fails, it falls back to independent engines (Exa → Perplexity → Tavily → LangSearch) which return titles, URLs, and snippets.
 
 ## When to Use
 
@@ -22,8 +24,10 @@ Search the web for current information on any topic. Returns relevant search res
 ## Usage Notes
 
 - Provide specific, well-formed search queries for best results
-- Returns up to 5 results with URLs and content snippets
-- Use for supplementary research when get_financials doesn't cover the topic
+- source="auto" (default): native model search first, then independent engines
+- source="independent": skip native search; use Exa/Perplexity/Tavily/LangSearch (link lists)
+- source="native": current-model search only; do not fall back
+- After independent results, use web_fetch when you need the full page
 `.trim();
 
 export { tavilySearch } from './tavily.js';

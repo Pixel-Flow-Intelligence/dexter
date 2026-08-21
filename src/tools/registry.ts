@@ -2,6 +2,7 @@ import { StructuredToolInterface } from '@langchain/core/tools';
 import { createGetFinancials, createGetMarketData, createReadFilings, createScreenStocks } from './finance/index.js';
 import { exaSearch, perplexitySearch, tavilySearch, langSearch, WEB_SEARCH_DESCRIPTION, xSearchTool, X_SEARCH_DESCRIPTION } from './search/index.js';
 import { createWebSearchTool, type WebSearchProvider } from './search/web-search.js';
+import { canUseNativeSearch } from './search/native-search.js';
 import { getSetting } from '../utils/config.js';
 import type { SearchProviderId } from '../utils/env.js';
 import { skillTool, SKILL_TOOL_DESCRIPTION } from './skill.js';
@@ -161,8 +162,8 @@ export function getToolRegistry(model: string): RegisteredTool[] {
     },
   ];
 
-  // Build web_search as a fallback chain over whichever providers have keys configured.
-  // The user's preferred provider (set via /search) is tried first; the others act as fallbacks.
+  // web_search: native Sub2API search first (when the model supports it), then
+  // independent engines. /search only orders the independent fallback chain.
   const allWebSearchProviders: WebSearchProvider[] = [];
   if (process.env.EXASEARCH_API_KEY) {
     allWebSearchProviders.push({ id: 'exa', name: 'Exa', tool: exaSearch });
@@ -177,7 +178,8 @@ export function getToolRegistry(model: string): RegisteredTool[] {
     allWebSearchProviders.push({ id: 'langsearch', name: 'LangSearch', tool: langSearch });
   }
 
-  if (allWebSearchProviders.length > 0) {
+  const nativeSearchAvailable = canUseNativeSearch(model);
+  if (allWebSearchProviders.length > 0 || nativeSearchAvailable) {
     const preferred = getSetting<SearchProviderId | undefined>('webSearchPreferredProvider', undefined);
     const orderedProviders = preferred
       ? [
@@ -188,9 +190,9 @@ export function getToolRegistry(model: string): RegisteredTool[] {
 
     tools.push({
       name: 'web_search',
-      tool: createWebSearchTool(orderedProviders),
+      tool: createWebSearchTool(orderedProviders, model),
       description: WEB_SEARCH_DESCRIPTION,
-      compactDescription: 'Search the web for current information. Returns titles, URLs, and snippets.',
+      compactDescription: 'Search the web. Default: current-model native search via Sub2API (sourced answer); source=independent for Exa/Tavily link lists.',
       concurrencySafe: true,
     });
   }

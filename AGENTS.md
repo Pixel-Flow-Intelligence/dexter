@@ -56,7 +56,7 @@
 - `financial_search`: primary tool for all financial data queries (prices, metrics, filings). Delegates to multiple sub-tools internally.
 - `financial_metrics`: direct metric lookups (revenue, market cap, etc.).
 - `read_filings`: SEC filing reader for 10-K, 10-Q, 8-K documents.
-- `web_search`: general web search (Exa if `EXASEARCH_API_KEY` set, else Tavily if `TAVILY_API_KEY` set).
+- `web_search`: current-model native search via Sub2API (OpenAI/Grok/Claude `web_search`, Gemini `google_search`) when `OPENAI_BASE_URL` is set; falls back to Exa → Perplexity → Tavily → LangSearch. Pass `source=independent` to skip native search.
 - `browser`: Playwright-based web scraping for reading pages the agent discovers.
 - `skill`: invokes SKILL.md-defined workflows (e.g. DCF valuation). Each skill runs at most once per query.
 - Tool registry: `src/tools/registry.ts`. Tools are conditionally included based on env vars.
