@@ -32,6 +32,18 @@ export function coingeckoConfig() {
   };
 }
 
+export function finnhubConfig() {
+  return {
+    apiKey: envOr('FINNHUB_API_KEY'),
+    baseUrl: envOr('FINNHUB_BASE_URL', 'https://finnhub.io/api/v1').replace(/\/+$/, ''),
+  };
+}
+
+/** SEC EDGAR requires a descriptive User-Agent with contact email. */
+export function secUserAgent(): string {
+  return envOr('SEC_USER_AGENT', 'DexterFinance/1.0 contact@dexter.local');
+}
+
 export function hasKey(value: string): boolean {
   return Boolean(value) && !value.toLowerCase().startsWith('your-');
 }

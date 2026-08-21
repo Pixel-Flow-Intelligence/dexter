@@ -3,6 +3,7 @@ import { sifting } from './sifting.js';
 import { coingecko } from './coingecko.js';
 import { businessQuant } from './business-quant.js';
 import { sec } from './sec.js';
+import { finnhub } from './finnhub.js';
 import { withFallback } from './http.js';
 
 export interface ApiResponse {
@@ -81,17 +82,23 @@ export async function routeGet(
   // --- get_market_data ---
   if (path === '/prices/snapshot') {
     return withFallback('price-snapshot', [
+      { name: 'Finnhub', run: async () => wrap(await finnhub.priceSnapshot(params)) },
       { name: 'FMP', run: async () => wrap(await fmp.priceSnapshot(params)) },
     ]);
   }
   if (path === '/prices') {
     return withFallback('price-history', [
       { name: 'FMP', run: async () => wrap(await fmp.priceHistory(params)) },
+      { name: 'Finnhub', run: async () => wrap(await finnhub.priceHistory(params)) },
     ]);
   }
   if (path === '/prices/snapshot/tickers') {
     return withFallback('stock-tickers', [
       { name: 'FMP', run: async () => wrap(await fmp.stockTickers()) },
+      {
+        name: 'Finnhub',
+        run: async () => wrap(await finnhub.searchSymbol(String(params.q || params.query || 'AAPL'))),
+      },
     ]);
   }
   if (path === '/crypto/prices/snapshot') {
@@ -111,6 +118,7 @@ export async function routeGet(
   }
   if (path === '/news') {
     return withFallback('news', [
+      { name: 'Finnhub', run: async () => wrap(await finnhub.news(params)) },
       { name: 'FMP', run: async () => wrap(await fmp.news(params)) },
       {
         name: 'Sifting-earnings-8K',
@@ -134,6 +142,7 @@ export async function routeGet(
   }
   if (path === '/insider-trades') {
     return withFallback('insider-trades', [
+      { name: 'Finnhub', run: async () => wrap(await finnhub.insiderTrades(params)) },
       { name: 'Sifting', run: async () => wrap(await sifting.insiderTrades(params)) },
       { name: 'BusinessQuant', run: async () => wrap(await businessQuant.insiderTransactions(params)) },
     ]);
@@ -218,12 +227,13 @@ export async function routeGet(
     ]);
   }
   if (path === '/filings/items') {
+    // SEC EDGAR HTML + EFTS is the working path; BQ filing-sections often 403.
     return withFallback('filing-items', [
+      { name: 'SEC', run: async () => wrap(await sec.filingItems(params)) },
       {
         name: 'BusinessQuant',
         run: async () => wrap(await businessQuant.filingSections(params)),
       },
-      { name: 'SEC', run: async () => wrap(await sec.filingItems(params)) },
     ]);
   }
 

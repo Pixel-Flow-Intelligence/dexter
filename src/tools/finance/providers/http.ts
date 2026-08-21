@@ -25,17 +25,18 @@ function decodeBody(raw: ArrayBuffer, contentEncoding: string | null): string {
   return buf.toString('utf-8');
 }
 
-export async function providerFetch(
+async function fetchDecoded(
   provider: string,
   url: string,
   init: RequestInit = {},
-): Promise<{ data: unknown; url: string }> {
+  defaultAccept = 'application/json',
+): Promise<{ text: string; status: number; url: string }> {
   let response: Response;
   try {
     response = await fetch(url, {
       ...init,
       headers: {
-        Accept: 'application/json',
+        Accept: defaultAccept,
         'User-Agent': 'DexterFinance/1.0',
         ...init.headers,
       },
@@ -54,6 +55,16 @@ export async function providerFetch(
     throw new ProviderHttpError(provider, response.status, text.slice(0, 300) || response.statusText);
   }
 
+  return { text, status: response.status, url };
+}
+
+export async function providerFetch(
+  provider: string,
+  url: string,
+  init: RequestInit = {},
+): Promise<{ data: unknown; url: string }> {
+  const { text, status } = await fetchDecoded(provider, url, init, 'application/json');
+
   if (!text.trim()) {
     return { data: null, url };
   }
@@ -61,8 +72,18 @@ export async function providerFetch(
   try {
     return { data: JSON.parse(text) as unknown, url };
   } catch {
-    throw new ProviderHttpError(provider, response.status, `invalid JSON: ${text.slice(0, 120)}`);
+    throw new ProviderHttpError(provider, status, `invalid JSON: ${text.slice(0, 120)}`);
   }
+}
+
+/** Fetch raw text/HTML (SEC filing documents, etc.). */
+export async function providerFetchText(
+  provider: string,
+  url: string,
+  init: RequestInit = {},
+): Promise<{ text: string; url: string }> {
+  const { text } = await fetchDecoded(provider, url, init, 'text/html,application/xhtml+xml,*/*');
+  return { text, url };
 }
 
 export async function withFallback<T>(
