@@ -21,7 +21,7 @@ describe('memory embeddings', () => {
   test('uses the configured OpenAI-compatible base URL', () => {
     process.env.OPENAI_API_KEY = 'test-key';
     process.env.OPENAI_BASE_URL = 'https://example.test/v1';
-    const embeddings = createOpenAIEmbeddings() as { clientConfig?: { baseURL?: string } };
+    const embeddings = createOpenAIEmbeddings() as unknown as { clientConfig?: { baseURL?: string } };
     expect(embeddings.clientConfig?.baseURL).toBe('https://example.test/v1');
   });
 
