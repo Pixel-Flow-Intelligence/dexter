@@ -21,7 +21,7 @@ const EarningsInputSchema = z.object({
 export const getEarnings = new DynamicStructuredTool({
   name: 'get_earnings',
   description:
-    'Fetches earnings data from Financial Datasets. Pass a ticker for company-specific earnings, or omit ticker to fetch the latest earnings feed across all covered companies.',
+    'Fetches earnings data. Pass a ticker for company-specific earnings, or omit ticker to fetch the latest earnings feed across covered companies.',
   schema: EarningsInputSchema,
   func: async (input) => {
     const ticker = input.ticker?.trim().toUpperCase();

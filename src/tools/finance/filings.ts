@@ -27,13 +27,10 @@ export async function getFilingItemTypes(): Promise<FilingItemTypes> {
     return cachedItemTypes;
   }
 
-  const response = await fetch('https://api.financialdatasets.ai/filings/items/types/');
-  if (!response.ok) {
-    throw new Error(`[Financial Datasets API] Failed to fetch filing item types: ${response.status}`);
-  }
-  const itemTypes = (await response.json()) as FilingItemTypes;
-  cachedItemTypes = itemTypes;
-  return itemTypes;
+  // Static item catalog — Financial Datasets is unused; section names are stable SEC labels.
+  const { DEFAULT_FILING_ITEM_TYPES } = await import('./providers/sec.js');
+  cachedItemTypes = DEFAULT_FILING_ITEM_TYPES as unknown as FilingItemTypes;
+  return cachedItemTypes;
 }
 
 const FilingsInputSchema = z.object({

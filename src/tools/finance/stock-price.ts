@@ -4,7 +4,7 @@ import { api } from './api.js';
 import { formatToolResult } from '../types.js';
 
 export const STOCK_PRICE_DESCRIPTION = `
-Fetches the current stock price snapshot for an equity: latest price and the day's change. For open/high/low/close and volume over a range, use historical prices. Powered by Financial Datasets.
+Fetches the current stock price snapshot for an equity: latest price and the day's change. For open/high/low/close and volume over a range, use historical prices.
 `.trim();
 
 const StockPriceInputSchema = z.object({
